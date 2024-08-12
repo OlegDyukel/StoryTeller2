@@ -5,7 +5,7 @@ class GeminiAPI:
     def __init__(self, kwargs):
         genai.configure(api_key=kwargs.get('api_key'))
         self.model = genai.Model('model', 'models/chat-bison-001')
-        self.temperature = kwargs.get('temperature', 0.7)
+        self.temperature = kwargs.get('temperature', 0.99)
         self.max_tokens = kwargs.get('max_tokens', 100)
 
     def generate_response(self, prompt) -> str:
