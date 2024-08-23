@@ -1,33 +1,43 @@
 import json
+import asyncio
+import logging
+
+from prompts import News, Tasks
 from openai_api import OpenaiAPI
 from config import Config
 from tg_api import TelegramBot
-import asyncio
-from prompts import News, Tasks
 
 
 if __name__ == "__main__":
-    openai = OpenaiAPI(
-        api_key=Config.OPENAI_API_KEY,
-        model='gpt-4o'
-    )
+    language = 'English'
+    openai = OpenaiAPI(api_key=Config.OPENAI_API_KEY, model='gpt-4o')
+
+    #### NEWS GENERATION
     news = News()
     news_messages = news.get_prompt()
     news = openai.generate_response(messages=news_messages)
-    news_lst = json.loads(news)
-    if news_lst:
-        print(f"Generated News: {news_lst}")
-    else:
-        print("Failed to generate text.")
+    try:
+        news_lst = json.loads(news)
+        logging.info(f"Generated News: {news_lst}")
+    except json.decoder.JSONDecodeError as e:
+        logging.error(f"Most likely the News are not in json: {e}")
+        logging.info(f"The output: {news_messages}")
+        raise "Failed to get news in JSON format"
 
-    tasks = Tasks(news_lst)
+    #### QUIZZES GENERATION
+    tasks = Tasks(news=news_lst, language=language)
     questions_messages = tasks.get_prompt()
     questions = openai.generate_response(messages=questions_messages)
-    questions_lst = json.loads(questions)
-    if questions_lst:
-        print(f"Generated News: {questions_lst}")
-    else:
-        print("Failed to generate text.")
+    try:
+        questions_lst = json.loads(questions)
+        logging.info(f"Generated News: {questions_lst}")
+    except json.decoder.JSONDecodeError as e:
+        logging.error(f"Most likely the Quizzes are not in json format: {e}")
+        logging.info(f"The output: {questions_messages}")
+        raise
+
+    #### VERRIFICATION BY OTHER AI
+
 
     ############## TG #########
     bot = TelegramBot(token=Config.TG_TOKEN)

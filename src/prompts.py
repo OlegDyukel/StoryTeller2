@@ -2,18 +2,37 @@ import random
 import datetime
 
 n_questions = 4
-LANGUAGE = 'English'
 CATEGORIES = ['Sport', 'Disaster', 'Innovation', 'Science', 'Environment', 'Technology',
               'Healthcare', 'Politics']
 REGIONS = ['Europe', 'Asia', 'Africa', 'North America', 'South America', 'India', 'Russia']
-TOPICS = ['Present and past', 'Present perfect and past', 'Future', 'Modals', 'If and wish',
-          'Passive', 'Reported speech', 'Questions and auxiliary verbs', '-ing and the infinitive',
-          'Articles and nouns', 'Pronouns and determiners', 'Relative clauses', 'Prepositions',
-          'Adjectives and adverbs', 'Conjunctions and prepositions', 'Phrasal verbs', 'Organising information',
-          'Adverbial clauses and conjunctions', 'Pronouns, substitution and leaving out words',
-          'Relative clauses and other types of clause', 'Articles, determiners and quantifiers',
-          'Verb complementation: what follows verbs', 'Linking verbs, passives, questions',
-          'Modals and semi-modals']
+ENGLISH_GRAMMAR_TOPICS = [
+    'Present and past', 'Present perfect and past', 'Future', 'Modals', 'If and wish',
+    'Passive', 'Reported speech', 'Questions and auxiliary verbs', '-ing and the infinitive',
+    'Articles and nouns', 'Pronouns and determiners', 'Relative clauses', 'Prepositions',
+    'Adjectives and adverbs', 'Conjunctions and prepositions', 'Phrasal verbs',
+    'Adverbial clauses and conjunctions', 'Pronouns, substitution and leaving out words',
+    'Relative clauses and other types of clause', 'Articles, determiners and quantifiers',
+    'Verb complementation: what follows verbs', 'Linking verbs, passives, questions',
+    'Modals and semi-modals']
+
+SPANISH_GRAMMAR_TOPICS = [
+    "Present Tense (Presente)", "Past Tenses: Preterite and Imperfect (Pretérito y Imperfecto)",
+    "Present Perfect and Past Perfect (Pretérito Perfecto y Pluscuamperfecto)", "Future Tense (Futuro)",
+    "Conditional Tense (Condicional)", "Modal Verbs (Verbos Modales)",
+    "Subjunctive Mood (Presente de Subjuntivo)", "Commands/Imperative (Imperativo)", "Passive Voice (Voz Pasiva)",
+    "Reported Speech (Estilo Indirecto)", "Questions and Question Words (Interrogativos)",
+    "Gerunds and Infinitives (Gerundios e Infinitivos)",
+    "Definite and Indefinite Articles (Artículos Definidos e Indefinidos)", "Nouns and Gender (Sustantivos y Género)",
+    "Pronouns (Pronombres)", "Adjectives (Adjetivos)", "Adverbs (Adverbios)", "Prepositions (Preposiciones)",
+    "Conjunctions (Conjunciones)", "Relative Clauses (Oraciones de Relativo)",
+    "Phrasal Verbs and Verb Phrases (Verbos Frasales y Frases Verbales)",
+    "Direct and Indirect Object Pronouns (Pronombres de Objeto Directo e Indirecto)",
+    "Reflexive Verbs (Verbos Reflexivos)", "Comparatives and Superlatives (Comparativos y Superlativos)",
+    "Tense Agreement (Concordancia de Tiempos)", "Ser vs. Estar (Usage of 'Ser' and 'Estar')",
+    "Por vs. Para (Usage of 'Por' and 'Para')", "Impersonal Expressions (Expresiones Impersonales)",
+    "Negation (Negación)", "Word Order (Orden de las Palabras)"]
+
+TOPICS = {'English': ENGLISH_GRAMMAR_TOPICS, 'Spanish': SPANISH_GRAMMAR_TOPICS}
 
 class News:
     def __init__(self):
@@ -78,8 +97,9 @@ class News:
 
 
 class Tasks:
-    def __init__(self, news: list):
+    def __init__(self, news: list, language: str):
         super().__init__()
+        self.language = language
         self.question_examples = [
             {
                 "question_id": 1,
@@ -105,8 +125,18 @@ class Tasks:
                 "correct_option_id": 3,
                 "explanation": "There were too many: This is correct because were matches the plural noun people, and many is the appropriate quantifier for countable nouns"
             },
+            {
+                "question_id": 4,
+                "grammar_topic": "Phrasal verbs",
+                "question": "Turn down is ...",
+                "options": ["to take care of someone or something", "to stop trying to do something or to quit",
+                            "to reject or refuse something, such as an offer or invitation",
+                            "to meet someone unexpectedly or by chance"],
+                "correct_option_id": 2,
+                "explanation": "Example: I had to turn down the job offer because it wasn't the right fit for me."
+            },
         ]
-        self.grammar_topics = random.sample(TOPICS, k=n_questions)
+        self.grammar_topics = random.sample(TOPICS[self.language], k=n_questions)
         self.question_grammar_news_mapping = []
         for i in range(n_questions):
             d = {'question_id': i+1, 'grammar_topic': self.grammar_topics[i], 'news': news[i]['text']}
@@ -114,9 +144,9 @@ class Tasks:
 
     def get_prompt(self) -> list:
         system_prompt = f"""
-        You are a language learning quiz generator in {LANGUAGE}. 
+        You are a language learning quiz generator in {self.language}. 
         Your task is to create multiple-choice questions 
-        focused on {LANGUAGE} grammar and vocabulary. 
+        focused on {self.language} grammar and vocabulary. 
         """
 
         prompt = f"""
@@ -144,13 +174,19 @@ class Tasks:
         ]
         
         Here is an example to illustrate the format: {self.question_examples}
-          
-        Questions should be related to the following grammar topics and news:
-        {self.question_grammar_news_mapping}
+        
+        The first {n_questions-1} questions should be grammar questions and related to the following grammar 
+        topics and news: {self.question_grammar_news_mapping[:n_questions-1]}.
+        
+        The last question should be about definition of a word (phrasal verbs or other intermediate level words).
+        In the last question, the explanation should be just an example of some sentence using the following news:
+        {self.question_grammar_news_mapping[-1]}
+        Example: {self.question_examples[-1]}
         
         Please generate similar questions in this format, ensuring the options are varied and the 
         correct option is accurately identified.
-        Poll question length must not exceed 300.
+        The questions and answers should be in {self.language}.
+        Poll question length must not exceed 260.
         """
 
         messages = [
