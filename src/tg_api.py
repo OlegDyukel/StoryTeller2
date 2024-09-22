@@ -14,20 +14,21 @@ class TelegramBot:
         except Exception as e:
             logging.error(f"Error sending message: {e}. Tried to send: {message}")
 
-    async def send_quizzes(self, chat_id: str, questions_list: list):
-        for question in questions_list:
-            try:
-                await self.bot.send_poll(
-                    chat_id=chat_id,
-                    question="Topic: " + question['grammar_topic'] + ".\n" + "\n" + question['question'],
-                    options=question['options'],
-                    type='quiz',
-                    correct_option_id=question['correct_option_id'],
-                    explanation=question['explanation'],
-                    is_anonymous=True
-                )
-                logging.info(f"Quiz sent successfully: {question}")
-            except Exception as e:
-                logging.error(f"An error occurred: {e}. Tried to send {question}")
-            sleep_time = random.randint(5, 9)
-            time.sleep(sleep_time)
+    async def send_quizzes(self, chats: dict, questions: dict):
+        for language, questions_lst in questions.items():
+            for question in questions_lst:
+                try:
+                    await self.bot.send_poll(
+                        chat_id=chats[language],
+                        question="Topic: " + question['grammar_topic'] + ".\n" + "\n" + question['question'],
+                        options=question['options'],
+                        type='quiz',
+                        correct_option_id=question['correct_option_id'],
+                        explanation=question['explanation'],
+                        is_anonymous=True
+                    )
+                    logging.info(f"Quiz sent successfully: {question}")
+                except Exception as e:
+                    logging.error(f"An error occurred: {e}. Tried to send {question}")
+                sleep_time = random.randint(5, 9)
+                time.sleep(sleep_time)

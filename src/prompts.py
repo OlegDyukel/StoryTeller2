@@ -32,7 +32,7 @@ SPANISH_GRAMMAR_TOPICS = [
     "Por vs. Para (Usage of 'Por' and 'Para')", "Impersonal Expressions (Expresiones Impersonales)",
     "Negation (Negación)", "Word Order (Orden de las Palabras)"]
 
-TOPICS = {'English': ENGLISH_GRAMMAR_TOPICS, 'Spanish': SPANISH_GRAMMAR_TOPICS}
+TOPICS = {'english': ENGLISH_GRAMMAR_TOPICS, 'spanish': SPANISH_GRAMMAR_TOPICS}
 
 class News:
     def __init__(self):
@@ -100,7 +100,17 @@ class Tasks:
     def __init__(self, news: list, language: str):
         super().__init__()
         self.language = language
-        self.question_examples = [
+        self.question_format = [
+            {
+                "question_id": "<ID of the question (1, 2, 3, 4, ...)>",
+                "grammar_topic": "The grammar topic the question addresses",
+                "question": "The incomplete sentence requiring a correct option.",
+                "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+                "correct_option_id": "<ID of the correct option (0, 1, 2, or 3)>",
+                "explanation": " a short explanation of the correct answer "
+            },
+        ]
+        self.question_example = [
             {
                 "question_id": 1,
                 "grammar_topic": "Prepositions",
@@ -129,13 +139,20 @@ class Tasks:
                 "question_id": 4,
                 "grammar_topic": "Phrasal verbs",
                 "question": "Turn down is ...",
-                "options": ["to take care of someone or something", "to stop trying to do something or to quit",
+                "options": ["to reduce the volume or intensity of something",
+                            "to stop trying to do something or to quit",
                             "to reject or refuse something, such as an offer or invitation",
                             "to meet someone unexpectedly or by chance"],
                 "correct_option_id": 2,
                 "explanation": "Example: I had to turn down the job offer because it wasn't the right fit for me."
             },
         ]
+        self.verification_format = [{'question_id': '1 or 2 or 3 or 4 (id of a given question)',
+                                     'correct_options': ['a list of id of correct options: from 0 to 3']}]
+        self.verification_example = [{'question_id': 1, 'correct_options': [3]},
+                                     {'question_id': 2, 'correct_options': [1]},
+                                     {'question_id': 3, 'correct_options': [3]},
+                                     {'question_id': 4, 'correct_options': [0, 2]}]
         self.grammar_topics = random.sample(TOPICS[self.language], k=n_questions)
         self.question_grammar_news_mapping = []
         for i in range(n_questions):
@@ -173,7 +190,7 @@ class Tasks:
             ...
         ]
         
-        Here is an example to illustrate the format: {self.question_examples}
+        Here is an example to illustrate the format: {self.question_example}
         
         The first {n_questions-1} questions should be grammar questions and related to the following grammar 
         topics and news: {self.question_grammar_news_mapping[:n_questions-1]}.
@@ -181,12 +198,12 @@ class Tasks:
         The last question should be about definition of a word (phrasal verbs or other intermediate level words).
         In the last question, the explanation should be just an example of some sentence using the following news:
         {self.question_grammar_news_mapping[-1]}
-        Example: {self.question_examples[-1]}
+        Example: {self.question_example[-1]}
         
         Please generate similar questions in this format, ensuring the options are varied and the 
         correct option is accurately identified.
         The questions and answers should be in {self.language}.
-        Poll question length must not exceed 260.
+        Poll question length must not exceed 250.
         """
 
         messages = [
@@ -194,3 +211,29 @@ class Tasks:
             {"role": "user", "content": prompt}
         ]
         return messages
+
+    def verify(self, questions: dict) -> str:
+        system_prompt = f"""
+        You are a professional linguist and a {self.language} teacher at university. 
+        """
+
+        prompt = f"""
+            You will receive {n_questions} language tasks related to grammar and vocabulary, 
+            with 4 possible answers for each task.
+            Your task is to define which options are correct.
+            There might be 0, 1, 2, 3 or even 4 correct/possible answers.
+            You will get the tasks in JSON format and you need to return a result in JSON format.
+            The input and output have the following structure:
+            INPUT FORMAT:
+            {self.question_format}
+            EXAMPLE OF INPUT:
+            {self.question_example}
+            !!! HEADS UP: Please ignore correct_option_id in input data. It might be wrong!!!
+            OUTPUT FORMAT:
+            {self.verification_format}
+            EXAMPLE OF OUTPUT:
+            {self.verification_example}.
+            So following the instructions above please provide answers to the following tasks:
+            {questions}
+        """
+        return system_prompt + " " + prompt

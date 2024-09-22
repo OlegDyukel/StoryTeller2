@@ -1,32 +1,30 @@
-from google.cloud import aiplatform
-import vertexai
+import google.generativeai as genai
+import typing_extensions as typing
 import logging
 
-KEY_FILE_PATH = r"C:\Users\user\Documents\projects\GPT coach\celtic-ego-255816-637d51daf4e6.json"
+
+class Verification(typing.TypedDict):
+    question_id: int
+    correct_options: list
+
 
 class GeminiAPI:
-    def __init__(self):
-        vertexai.init(project="celtic-ego-255816", location="europe-west3", credentials=KEY_FILE_PATH)
-        self.model = "gemini-1.5-pro-001"
-        self.parameters = {
-            "temperature": 0.7,
-            "max_output_tokens": 500,
-            "top_p": 0.8,
-            "top_k": 40
-        }
+    def __init__(self, **kwargs):
+        genai.configure(api_key=kwargs.get('api_key'))
+        self.model = genai.GenerativeModel(kwargs.get('model', 'gemini-1.5-pro'))
+        self.generation_config = genai.types.GenerationConfig(
+            candidate_count=1,
+            temperature=kwargs.get('temperature', 0.1),
+            max_output_tokens=kwargs.get('max_tokens', 1000),
+            # stop_sequences=["x"],
+            response_mime_type='application/json',
+            # response_schema=list[Verification]
+        )
 
-    def generate_response(self, prompt) -> str:
+    def generate_response(self, messages):
         try:
-            response = vertexai.language_models.generate_text(
-                model=self.model,
-                prompt=prompt,
-                parameters=self.parameters
-            )
-            content = response.candidates[0].output
-            logging.info(content)
-            return content
-        except vertexai.exceptions.ApiException as e:
-            logging.error(f"Vertex AI API Error: {e}")
-        except Exception as e:  # Catch any other unexpected errors
-            logging.error(f"Unexpected Error: {e}")
-        return ""  # Return an empty string in case of errors
+            response = self.model.generate_content(messages, generation_config=self.generation_config,)
+            return response.text
+        except Exception as e:
+            logging.error(f"An error occurred: {e}")
+            return None

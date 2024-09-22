@@ -8,7 +8,7 @@ class OpenaiAPI:
         self.client = OpenAI(api_key=kwargs.get('api_key'))
         self.model = kwargs.get('model', 'gpt-4o')
         self.temperature = kwargs.get('temperature', 0.3)
-        self.max_tokens = kwargs.get('max_tokens', 1000)
+        self.max_tokens = kwargs.get('max_tokens', 1200)
 
     def generate_response(self, messages):
         try:
