@@ -37,6 +37,7 @@ TOPICS = {'english': ENGLISH_GRAMMAR_TOPICS, 'spanish': SPANISH_GRAMMAR_TOPICS}
 class News:
     def __init__(self):
         self.date = datetime.datetime.today().date()
+        self.news_format = [{"id": 1, "category": "sport", "region": "world", "text": "something ..."}, ]
         self.news_examples = [
             {
                 "id": 1,
@@ -70,13 +71,7 @@ class News:
         prompt = f"""
             Please generate {n_questions} diverse news stories with IDs, categories, regions, and texts 
             as of {self.date} day
-            in the following JSON array without any additional text:
-            
-            [
-                {{"id": 1, "category": "sport", "region": "world", "text": "something ..."}},
-                ...
-            ]
-            
+            in the following JSON array without any additional text: {self.news_format}
             Here is an example to illustrate the format: {self.news_examples}
             
             Constraints:
@@ -84,9 +79,7 @@ class News:
             {self.news_category_mapping}
             
             The text of news should be a narrative and easily perceived story.
-            
-            The text of news can be 1, 2 or maximum 3 sentences.
-            
+            The text of the news can be 1, 2 or a maximum of 3 sentences and no more than 1000 characters.
             Ensure that each entry follows this structure with relevant and updated information as of {self.date}.
             """
         messages = [
@@ -154,9 +147,11 @@ class Tasks:
                                      {'question_id': 3, 'correct_options': [3]},
                                      {'question_id': 4, 'correct_options': [0, 2]}]
         self.grammar_topics = random.sample(TOPICS[self.language], k=n_questions)
+        self.correct_answers = random.sample([0, 1, 2, 3, 0, 1, 2, 3], k=4)
         self.question_grammar_news_mapping = []
         for i in range(n_questions):
-            d = {'question_id': i+1, 'grammar_topic': self.grammar_topics[i], 'news': news[i]['text']}
+            d = {'question_id': i+1, 'grammar_topic': self.grammar_topics[i], 'news': news[i]['text'],
+                 'correct_answer_id': self.correct_answers[i]}
             self.question_grammar_news_mapping.append(d)
 
     def get_prompt(self) -> list:
@@ -177,33 +172,35 @@ class Tasks:
         
         Please output the result as a JSON array without any additional text.
         The output should have the following format:
-        
-        [
-            {{
-              "question_id": <ID of the question (1, 2, 3, 4, ...)>,
-              "grammar_topic": "The grammar topic the question addresses",
-              "question": "The incomplete sentence requiring a correct option.",
-              "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-              "correct_option_id": <ID of the correct option (0, 1, 2, or 3)>,
-              "explanation": " a short explanation of the correct answer "
-            }},
-            ...
-        ]
-        
+        {self.question_format}
         Here is an example to illustrate the format: {self.question_example}
         
-        The first {n_questions-1} questions should be grammar questions and related to the following grammar 
-        topics and news: {self.question_grammar_news_mapping[:n_questions-1]}.
+        The first question should be a {self.question_grammar_news_mapping[0]['grammar_topic']} grammar question 
+        and related to {self.question_grammar_news_mapping[0]['news']} news. And please put the correct option to
+        {self.question_grammar_news_mapping[0]['correct_answer_id']} element of the list with options. Add an 
+        explanation of the correct option. The question length must not exceed 250 characters.
         
-        The last question should be about definition of a word (phrasal verbs or other intermediate level words).
-        In the last question, the explanation should be just an example of some sentence using the following news:
-        {self.question_grammar_news_mapping[-1]}
+        The second question should be a {self.question_grammar_news_mapping[1]['grammar_topic']} grammar question 
+        and related to {self.question_grammar_news_mapping[1]['news']} news. And please put the correct option to
+        {self.question_grammar_news_mapping[1]['correct_answer_id']} element of the list with options. Add an 
+        explanation of the correct option. The question length must not exceed 250 characters.
+        
+        The third question should be a {self.question_grammar_news_mapping[2]['grammar_topic']} grammar question 
+        and related to {self.question_grammar_news_mapping[2]['news']} news. And please put the correct option to
+        {self.question_grammar_news_mapping[2]['correct_answer_id']} element of the list with options. Add an 
+        explanation of the correct option. The question length must not exceed 250 characters.
+        
+        The fourth question should be about definition of a word (phrasal verbs or other intermediate level 
+        words).
+        The explanation should be just an example of some sentence using the following news:
+        {self.question_grammar_news_mapping[3]['news']}. And please put the correct option to
+        {self.question_grammar_news_mapping[3]['correct_answer_id']} element of the list with options.
+        The question length must not exceed 250 characters.
         Example: {self.question_example[-1]}
         
         Please generate similar questions in this format, ensuring the options are varied and the 
         correct option is accurately identified.
         The questions and answers should be in {self.language}.
-        Poll question length must not exceed 250.
         """
 
         messages = [
@@ -219,16 +216,19 @@ class Tasks:
 
         prompt = f"""
             You will receive {n_questions} language tasks related to grammar and vocabulary, 
-            with 4 possible answers for each task.
+            with 4 possible answers for each task. The possible answers are in the list under correct_option_id key.
             Your task is to define which options are correct.
-            There might be 0, 1, 2, 3 or even 4 correct/possible answers.
+            If the first element of the list is correct, put 0 to the output list which is the value of the
+            correct_options key in the output dictionary. If the second element is correct, then put 1 and so on.
+            There might be 0, 1, 2, 3 or even 4 correct/possible answers. Let's imagine there are 2 correct answers 
+            namely the second and fourth elements, then put 1 and 3 to the output list like [1, 3]. 
             You will get the tasks in JSON format and you need to return a result in JSON format.
             The input and output have the following structure:
             INPUT FORMAT:
             {self.question_format}
             EXAMPLE OF INPUT:
             {self.question_example}
-            !!! HEADS UP: Please ignore correct_option_id in input data. It might be wrong!!!
+            !!! HEADS UP: Please ignore correct_option_id key in input data. It might be wrong!!!
             OUTPUT FORMAT:
             {self.verification_format}
             EXAMPLE OF OUTPUT:

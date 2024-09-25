@@ -17,7 +17,8 @@ if __name__ == "__main__":
     #### NEWS GENERATION
     news = News()
     news_messages = news.get_prompt()
-    news_str = openai.generate_response(messages=news_messages)
+    #news_str = openai.generate_response(messages=news_messages)
+    news_str = gemini.generate_response(messages=news_messages[0]['content'] + news_messages[1]['content'])
     try:
         news_lst = json.loads(news_str)
         logging.info(f"Generated News: {news_lst}")
@@ -31,9 +32,11 @@ if __name__ == "__main__":
     questions = {}
     verified_questions = {}
     bad_questions = {}
+    verified_answers = {}
     for language in languages:
         questions[language] = []
         verified_questions[language] = []
+        verified_answers[language] = []
         bad_questions[language] = []
         tasks = Tasks(news=news_lst, language=language)
         questions_prompts = tasks.get_prompt()
@@ -52,7 +55,7 @@ if __name__ == "__main__":
         verification_prompt = tasks.verify(questions[language])
         verified_answers_str = gemini.generate_response(messages=verification_prompt)
         try:
-            verified_answers = json.loads(verified_answers_str)
+            verified_answers[language] = json.loads(verified_answers_str)
             logging.info(f"Generated News: {verified_answers}")
         except json.decoder.JSONDecodeError as e:
             error_msg = f"Most likely the Quizzes are not in json format: {e}"
@@ -60,7 +63,7 @@ if __name__ == "__main__":
             logging.info(f"The output: {verified_answers_str}")
             asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=verified_answers_str))
             raise error_msg
-        for va, q in zip(verified_answers, questions[language]):
+        for va, q in zip(verified_answers[language], questions[language]):
             if len(va['correct_options']) == 1 and va['correct_options'][0] == q['correct_option_id']:
                 verified_questions[language].append(q)
             else:
@@ -68,5 +71,5 @@ if __name__ == "__main__":
 
     ############## TG #########
     asyncio.run(bot.send_quizzes(chats=Config.CHANNEL_ID, questions=verified_questions))
-    asyncio.run(bot.send_quizzes(chats=Config.LOG_CHANNEL_ID, questions=bad_questions))
-    # asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=news_str))
+    asyncio.run(bot.send_bad_quizzes(chats=Config.LOG_CHANNEL_ID, questions=bad_questions))
+    asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=news_str))
