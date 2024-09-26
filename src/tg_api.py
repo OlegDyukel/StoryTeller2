@@ -9,7 +9,7 @@ class TelegramBot:
 
     async def send_message(self, chat_id: str, message: str):
         try:
-            await self.bot.send_message(chat_id=chat_id, text="news:" + message)
+            await self.bot.send_message(chat_id=chat_id, text=message)
             logging.info(f"Message {message} sent successfully")
         except Exception as e:
             logging.error(f"Error sending message: {e}. Tried to send: {message}")
