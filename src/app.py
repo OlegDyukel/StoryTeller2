@@ -41,7 +41,8 @@ def get_quizzes(model, news: list) -> dict:
             error_msg = f"Most likely the Quizzes are not in json format: {e}"
             logging.error(error_msg)
             logging.info(f"The output: {questions_prompts}")
-            asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=questions_str))
+            asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'],
+                                         message=questions_prompts[1]['content'] + questions_str))
             raise error_msg
     return questions
 
@@ -68,11 +69,11 @@ def verify(model, questions: dict) -> dict:
             raise error_msg
 
         for va, q in zip(second_opinion[language], questions[language]):
-            if len(va['correct_options']) == 1 and va['correct_options'][0] == q['correct_option_id']:
+            if len(va['correct_options']) == 1 and va['correct_options'][0] == q['options'][q['correct_option_id']]:
                 good_questions[language].append(q)
             else:
                 bad_questions[language].append(q)
-    return {'verified': good_questions, 'unverified': bad_questions}
+    return {'good': good_questions, 'bad': bad_questions}
 
 
 if __name__ == "__main__":
@@ -90,5 +91,5 @@ if __name__ == "__main__":
     verified_questions = verify(model=gemini, questions=questions)
 
     #### TG
-    asyncio.run(bot.send_quizzes(chats=Config.CHANNEL_ID, questions=verified_questions['verified']))
-    asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=str(verified_questions['unverified'])))
+    asyncio.run(bot.send_quizzes(chats=Config.CHANNEL_ID, questions=verified_questions['good']))
+    # asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=str(verified_questions['bad'])))

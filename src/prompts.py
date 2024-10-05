@@ -1,5 +1,6 @@
 import random
 import datetime
+import json
 
 n_questions = 4
 CATEGORIES = ['Sport', 'Disaster', 'Innovation', 'Science', 'Environment', 'Technology',
@@ -34,6 +35,12 @@ SPANISH_GRAMMAR_TOPICS = [
 
 TOPICS = {'english': ENGLISH_GRAMMAR_TOPICS, 'spanish': SPANISH_GRAMMAR_TOPICS}
 
+JSON_CONSTRAINTS = """
+Your response must be in JSON format,without using code blocks, additional text and the surrounding backticks.
+Keys, property names and string values must be enclosed in double quotes,
+in order to json.loads() function can process the response properly.
+"""
+
 class News:
     def __init__(self):
         self.date = datetime.datetime.today().date()
@@ -62,7 +69,7 @@ class News:
         self.news_regions = random.sample(REGIONS, k=n_questions)
         self.news_category_mapping = []
         for i in range(n_questions):
-            d = {'news_id': i+1, 'category': self.news_categories[i], 'region': self.news_regions[i]}
+            d = {"news_id": i+1, "category": self.news_categories[i], "region": self.news_regions[i]}
             self.news_category_mapping.append(d)
 
     def get_prompt(self) -> list:
@@ -71,12 +78,12 @@ class News:
         prompt = f"""
             Please generate {n_questions} diverse news stories with IDs, categories, regions, and texts 
             as of {self.date} day
-            in the following JSON array without any additional text: {self.news_format}
-            Here is an example to illustrate the format: {self.news_examples}
+            in the following JSON array without any additional text: {json.dumps(self.news_format)}
+            Here is an example to illustrate the format: {json.dumps(self.news_examples)}
             
             Constraints:
             News should be related to the following categories and regions:
-            {self.news_category_mapping}
+            {json.dumps(self.news_category_mapping)}
             
             The text of news should be a narrative and easily perceived story.
             The text of the news can be 1, 2 or a maximum of 3 sentences and no more than 1000 characters.
@@ -140,18 +147,20 @@ class Tasks:
                 "explanation": "Example: I had to turn down the job offer because it wasn't the right fit for me."
             },
         ]
-        self.verification_format = [{'question_id': '1 or 2 or 3 or 4 (id of a given question)',
-                                     'correct_options': ['a list of id of correct options: from 0 to 3']}]
-        self.verification_example = [{'question_id': 1, 'correct_options': [3]},
-                                     {'question_id': 2, 'correct_options': [1]},
-                                     {'question_id': 3, 'correct_options': [3]},
-                                     {'question_id': 4, 'correct_options': [0, 2]}]
+        self.verification_format = [{"question_id": "1 or 2 or 3 or 4 (id of a given question)",
+                                     "correct_options": ["a list of correct options"]}]
+        self.verification_example = [{"question_id": 1, "correct_options": ["on the"]},
+                                     {"question_id": 2, "correct_options": ["Bob has gone"]},
+                                     {"question_id": 3, "correct_options": ["There were too many people"]},
+                                     {"question_id": 4, "correct_options":
+                                         ["to reduce the volume or intensity of something",
+                                          "to reject or refuse something, such as an offer or invitation"]}]
         self.grammar_topics = random.sample(TOPICS[self.language], k=n_questions)
         self.correct_answers = random.sample([0, 1, 2, 3, 0, 1, 2, 3], k=4)
         self.question_grammar_news_mapping = []
         for i in range(n_questions):
-            d = {'question_id': i+1, 'grammar_topic': self.grammar_topics[i], 'news': news[i]['text'],
-                 'correct_answer_id': self.correct_answers[i]}
+            d = {"question_id": i+1, "grammar_topic": self.grammar_topics[i], "news": news[i]['text'],
+                 "correct_answer_id": self.correct_answers[i]}
             self.question_grammar_news_mapping.append(d)
 
     def get_prompt(self) -> list:
@@ -167,13 +176,12 @@ class Tasks:
         Each item of the list should be structured as a dictionary with the following 
         keys: `question_id`, `grammar_topic`, `question`, `options`, `correct_option_id` and `explanation`. 
         The `options` key should contain 
-        a list of possible answers, and `correct_option_id` should be the index of the 
+        a list of possible answers, and `correct_option_id` should be the index (integer) of the 
         correct answer in the `options` list (0-indexed). The correct answer should be only one.
         
-        Please output the result as a JSON array without any additional text.
         The output should have the following format:
-        {self.question_format}
-        Here is an example to illustrate the format: {self.question_example}
+        {json.dumps(self.question_format)}
+        Here is an example to illustrate the format: {json.dumps(self.question_example)}
         
         The first question should be a {self.question_grammar_news_mapping[0]['grammar_topic']} grammar question 
         and related to {self.question_grammar_news_mapping[0]['news']} news. And please put the correct option to
@@ -196,8 +204,9 @@ class Tasks:
         {self.question_grammar_news_mapping[3]['news']}. And please put the correct option to
         {self.question_grammar_news_mapping[3]['correct_answer_id']} element of the list with options.
         The question length must not exceed 250 characters.
-        Example: {self.question_example[-1]}
+        Example: {json.dumps(self.question_example[-1])}
         
+        Constraints: {JSON_CONSTRAINTS}
         Please generate similar questions in this format, ensuring the options are varied and the 
         correct option is accurately identified.
         The questions and answers should be in {self.language}.
@@ -209,31 +218,41 @@ class Tasks:
         ]
         return messages
 
-    def verify(self, questions: dict) -> str:
+    def verify(self, questions: list) -> str:
         system_prompt = f"""
-        You are a professional linguist and a {self.language} teacher at university. 
+        You are a professional linguist and an {self.language} teacher at university. 
         """
 
         prompt = f"""
             You will receive {n_questions} language tasks related to grammar and vocabulary, 
-            with 4 possible answers for each task. The possible answers are in the list under correct_option_id key.
+            with 4 possible answers for each task. The possible answers are in the list.
             Your task is to define which options are correct.
-            If the first element of the list is correct, put 0 to the output list which is the value of the
-            correct_options key in the output dictionary. If the second element is correct, then put 1 and so on.
-            There might be 0, 1, 2, 3 or even 4 correct/possible answers. Let's imagine there are 2 correct answers 
-            namely the second and fourth elements, then put 1 and 3 to the output list like [1, 3]. 
-            You will get the tasks in JSON format and you need to return a result in JSON format.
+            There might be 0, 1, 2, 3 or even 4 correct/possible answers. 
+            You will receive structured enumerated tasks and you need to return a result in JSON format.
             The input and output have the following structure:
-            INPUT FORMAT:
-            {self.question_format}
             EXAMPLE OF INPUT:
-            {self.question_example}
-            !!! HEADS UP: Please ignore correct_option_id key in input data. It might be wrong!!!
+            Task 1: {self.question_example[0]['question']} 
+            What answer/answers is/are correct? {json.dumps(self.question_example[0]['options'])}
+            Task 2: {self.question_example[1]['question']}
+            What answer/answers is/are correct? {json.dumps(self.question_example[1]['options'])}
+            Task 3: {self.question_example[2]['question']}
+            What answer/answers is/are correct? {json.dumps(self.question_example[2]['options'])}
+            Task 4: {self.question_example[3]['question']}
+            What answer/answers is/are correct? {json.dumps(self.question_example[3]['options'])}
             OUTPUT FORMAT:
-            {self.verification_format}
+            {json.dumps(self.verification_format)}
             EXAMPLE OF OUTPUT:
-            {self.verification_example}.
+            {json.dumps(self.verification_example)}.
             So following the instructions above please provide answers to the following tasks:
-            {questions}
+            Task 1: {questions[0]['question']} 
+            What answer/answers is/are correct? {json.dumps(questions[0]['options'])}
+            Task 2: {questions[1]['question']}
+            What answer/answers is/are correct? {json.dumps(questions[1]['options'])}
+            Task 3: {questions[2]['question']}
+            What answer/answers is/are correct? {json.dumps(questions[2]['options'])}
+            Task 4: {questions[3]['question']}
+            What answer/answers is/are correct? {json.dumps(questions[3]['options'])}
+            
+            CONSTRAINTS: {JSON_CONSTRAINTS}
         """
         return system_prompt + " " + prompt
