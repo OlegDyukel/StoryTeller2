@@ -218,7 +218,7 @@ class Tasks:
         ]
         return messages
 
-    def verify(self, questions: list) -> str:
+    def verify(self, questions: list) -> list:
         system_prompt = f"""
         You are a professional linguist and an {self.language} teacher at university. 
         """
@@ -255,4 +255,8 @@ class Tasks:
             
             CONSTRAINTS: {JSON_CONSTRAINTS}
         """
-        return system_prompt + " " + prompt
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        return messages
