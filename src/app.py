@@ -63,17 +63,6 @@ def verify(gemini_model, openai_model, questions: dict) -> dict:
     third_opinion = {language: [] for language in LANGUAGES}
 
     for language in LANGUAGES:
-        # [{"question_id": 1, "correct_options": ["on the"]},
-        #  {"question_id": 2, "correct_options": ["Bob has gone"]}, ..]
-        # [
-        #     {
-        #         "question_id": 1,
-        #         "grammar_topic": "Prepositions",
-        #         "question": "Alice travelled ___ 9:20 train, which arrived at 9:55.",
-        #         "options": ["in the", "by a", "by the", "on the"],
-        #         "correct_option_id": 3,
-        #         "explanation": "The preposition on is typically ..."
-        #     },
         for q in questions[language]:
             d = {'question_id': q['question_id'], 'correct_options': []}
             d['correct_options'].append(q['options'][q['correct_option_id']])
@@ -86,7 +75,7 @@ def verify(gemini_model, openai_model, questions: dict) -> dict:
         try:
             second_opinion[language] = json.loads(gemini_verif_str)
             logging.info(f"Generated Verification: {second_opinion[language]}")
-        except json.decoder.JSONDecodeError as e:
+        except Exception as e:
             logging.error(f"Most likely Gemini Verification is not in json format: {e}")
             logging.info(f"The prompt: {verification_prompt[1]['content']}")
             logging.info(f"The output: {json.dumps(gemini_verif_str)}")
@@ -96,14 +85,14 @@ def verify(gemini_model, openai_model, questions: dict) -> dict:
         try:
             third_opinion[language] = json.loads(openai_verif_str)
             logging.info(f"Generated Verification: {third_opinion[language]}")
-        except json.decoder.JSONDecodeError as e:
+        except Exception as e:
             logging.error(f"Most likely OpenAi Verification is not in json format: {e}")
             logging.info(f"The prompt: {verification_prompt[1]['content']}")
             logging.info(f"The output: {json.dumps(openai_verif_str)}")
             third_opinion[language] = initial_opinion[language]
 
         for q, op2, op3 in zip(questions[language], second_opinion[language], third_opinion[language]):
-            if len(q['options']) == len(set(q['options'])):
+            if len(q['options']) != len(set(q['options'])):
                 bad_questions[language].append(q)
                 continue
             if len(op2['correct_options']) != 1 or len(op3['correct_options']) != 1:
