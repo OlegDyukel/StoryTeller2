@@ -102,8 +102,10 @@ def verify(gemini_model, openai_model, questions: dict) -> dict:
             logging.info(f"The output: {json.dumps(openai_verif_str)}")
             third_opinion[language] = initial_opinion[language]
 
-        # TODO second-third opinion logic
         for q, op2, op3 in zip(questions[language], second_opinion[language], third_opinion[language]):
+            if len(q['options']) == len(set(q['options'])):
+                bad_questions[language].append(q)
+                continue
             if len(op2['correct_options']) != 1 or len(op3['correct_options']) != 1:
                 bad_questions[language].append(q)
                 continue
@@ -114,13 +116,11 @@ def verify(gemini_model, openai_model, questions: dict) -> dict:
                 bad_questions[language].append(q)
                 continue
             good_questions[language].append(q)
-            # if len(op2['correct_options']) == 1 and len(op3['correct_options'] == 1):
-            #     if op2['correct_options'][0] == q['options'][q['correct_option_id']] and op3['correct_options'][0] == q['options'][q['correct_option_id']]:
-            #         good_questions[language].append(q)
-            #     else:
-            #         bad_questions[language].append(q)
-            # else:
-            #     bad_questions[language].append(q)
+
+    logging.info(f"Questions: {json.dumps(questions)}")
+    logging.info(f"The second opinion: {json.dumps(second_opinion)}")
+    logging.info(f"The third opinion: {json.dumps(third_opinion)}")
+    logging.info(f"Bad questions: {json.dumps(bad_questions)}")
     return {'good': good_questions, 'bad': bad_questions}
 
 
@@ -140,4 +140,3 @@ if __name__ == "__main__":
 
     #### TG
     asyncio.run(bot.send_quizzes(chats=Config.CHANNEL_ID, questions=verified_questions['good']))
-    # asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=str(verified_questions['bad'])))
