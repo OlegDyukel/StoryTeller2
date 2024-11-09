@@ -3,7 +3,7 @@ import asyncio
 import logging
 import sys
 
-from prompts import News, Tasks
+from prompts import News, Tasks, Picture
 from openai_api import OpenaiAPI
 from gemini_api import GeminiAPI
 from config import Config
@@ -55,7 +55,7 @@ def get_quizzes(model, news: list) -> dict:
     return questions
 
 
-def verify(gemini_model, openai_model, questions: dict) -> dict:
+def verify(gemini_model: GeminiAPI, openai_model: OpenaiAPI, questions: dict) -> dict:
     good_questions = {language: [] for language in LANGUAGES}
     bad_questions = {language: [] for language in LANGUAGES}
     initial_opinion = {language: [] for language in LANGUAGES}
@@ -113,6 +113,18 @@ def verify(gemini_model, openai_model, questions: dict) -> dict:
     return {'good': good_questions, 'bad': bad_questions}
 
 
+def generat_image(image_model, topic: str):
+    # topic = News()
+    # topic_prompt = topic.get_news_story_prompt()
+    # prompt = topic_prompt[0]['content'] + topic_prompt[1]['content']
+    # topic_str = topic_model.generate_response(messages=prompt)
+
+    picture = Picture()
+    picture_prompt = picture.get_picture_prompt(text=json.dumps(topic))
+    image = image_model.generate_image(prompt=picture_prompt)
+    return image
+
+
 if __name__ == "__main__":
     openai = OpenaiAPI(api_key=Config.OPENAI_API_KEY, model='gpt-4o')
     gemini = GeminiAPI(api_key=Config.GEMINI_API_KEY, model='gemini-1.5-flash')
@@ -127,5 +139,10 @@ if __name__ == "__main__":
     #### VERIFICATION
     verified_questions = verify(gemini_model=gemini, openai_model=openai, questions=questions)
 
+    #### PICTURE GENERATION
+    image = generat_image(image_model=openai, topic=news_lst[0]["text"])
+
     #### TG
-    asyncio.run(bot.send_quizzes(chats=Config.CHANNEL_ID, questions=verified_questions['good']))
+    asyncio.run(bot.send_image_quizzes(chats=Config.CHANNEL_ID,
+                                       questions=verified_questions['good'],
+                                       image=image))

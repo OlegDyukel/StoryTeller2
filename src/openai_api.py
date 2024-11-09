@@ -1,5 +1,8 @@
 from openai import OpenAI
 import openai
+from io import BytesIO
+from PIL import Image
+import requests
 import logging
 
 class OpenaiAPI:
@@ -22,5 +25,18 @@ class OpenaiAPI:
             logging.info(f"Generated answer: {content}")
             return content
         except openai.APIError as e:
+            logging.error(f"An error occurred: {e}")
+            return None
+
+    def generate_image(self, prompt, model="dall-e-3"):
+        # https://github.com/openai/openai-python/blob/main/examples/picture.py
+        try:
+            # Request image generation from DALL-E using the updated API
+            response = openai.images.generate(prompt=prompt, model=model)
+            # Download the image
+            response = requests.get(response.data[0].url)
+            image = Image.open(BytesIO(response.content))
+            return image
+        except openai.OpenAIError as e:
             logging.error(f"An error occurred: {e}")
             return None

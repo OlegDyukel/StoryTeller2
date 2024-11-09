@@ -5,7 +5,8 @@ import json
 n_questions = 4
 CATEGORIES = ['Sport', 'Disaster', 'Innovation', 'Science', 'Environment', 'Technology',
               'Healthcare', 'Politics']
-REGIONS = ['Europe', 'Asia', 'Africa', 'North America', 'South America', 'India', 'Russia']
+REGIONS = ['Europe', 'Asia', 'Africa', 'North America', 'South America', 'USA', 'China and India',
+           'Oceania', 'Post-Soviet states']
 ENGLISH_GRAMMAR_TOPICS = [
     'Present and past', 'Present perfect and past', 'Future', 'Modals', 'If and wish',
     'Passive', 'Reported speech', 'Questions and auxiliary verbs', '-ing and the infinitive',
@@ -32,6 +33,10 @@ SPANISH_GRAMMAR_TOPICS = [
     "Tense Agreement (Concordancia de Tiempos)", "Ser vs. Estar (Usage of 'Ser' and 'Estar')",
     "Por vs. Para (Usage of 'Por' and 'Para')", "Impersonal Expressions (Expresiones Impersonales)",
     "Negation (Negación)", "Word Order (Orden de las Palabras)"]
+
+PICTURE_STYLES = ['pixel art', 'vivid, lively', 'pixar/disney', 'realistic photography',
+                  'anime/manga', 'watercolor and traditional art', 'cyberpunk and futuristic eesthetics',
+                  'minimalistic and flat', 'fantasy and mythological', 'surreal and abstract']
 
 TOPICS = {'english': ENGLISH_GRAMMAR_TOPICS, 'spanish': SPANISH_GRAMMAR_TOPICS}
 
@@ -88,6 +93,21 @@ class News:
             The text of news should be a narrative and easily perceived story.
             The text of the news can be 1, 2 or a maximum of 3 sentences and no more than 1000 characters.
             Ensure that each entry follows this structure with relevant and updated information as of {self.date}.
+            """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        return messages
+
+    def get_news_story_prompt(self) -> list:
+        system_prompt = "You are a news generator."
+        prompt = f"""
+            Please provide one of the most significant news story from this past week 
+            that has had a significant impact on the world.
+            Constraints:
+            The text of news should be a narrative and easily perceived story.
+            The text of the news can be 1, 2 or a maximum of 3 sentences and no more than 1000 characters.
             """
         messages = [
             {"role": "system", "content": system_prompt},
@@ -162,6 +182,9 @@ class Tasks:
             d = {"question_id": i+1, "grammar_topic": self.grammar_topics[i], "news": news[i]['text'],
                  "correct_answer_id": self.correct_answers[i]}
             self.question_grammar_news_mapping.append(d)
+
+    def get_correct_answers(self) -> list:
+        return self.question_grammar_news_mapping
 
     def get_prompt(self) -> list:
         system_prompt = f"""
@@ -260,3 +283,27 @@ class Tasks:
             {"role": "user", "content": prompt}
         ]
         return messages
+
+
+class Picture:
+    def __init__(self):
+        super().__init__()
+
+    def get_picture_prompt(self, text: str) -> str:
+        style = random.choice(PICTURE_STYLES)
+        system_prompt = f"""
+        You are an artist working at Pixar or Disney Studios.
+        """
+        prompt = f"""
+            Please create a symbolic or thematic illustration that captures the essence of the text in 
+            a {style} style:
+            {text}.
+            If you aren't able to generate such an image because it did not align with the content policy 
+            guidelines, please do a symbolic or thematic illustration that relates to one of the most significant 
+            news story from this past week that had a significant impact on the world.
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        return messages[0]['content'] + messages[1]['content']
