@@ -67,12 +67,12 @@ class TelegramBot:
         except Exception as e:
             logging.error(f"Error occurred while posting to Telegram: {e}")
 
-    async def send_image_quizzes(self, chats: dict, questions: dict, image: Image.Image):
+    async def send_image_quizzes(self, chats: dict, questions: dict, images: dict):
         for language, questions_lst in questions.items():
             try:
                 # Convert the PIL image to a byte array
                 byte_array = BytesIO()
-                image.save(byte_array, format='PNG')
+                images[language].save(byte_array, format='PNG')
                 byte_array.seek(0)
 
                 # Send the image to the specified chat

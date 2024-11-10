@@ -113,16 +113,14 @@ def verify(gemini_model: GeminiAPI, openai_model: OpenaiAPI, questions: dict) ->
     return {'good': good_questions, 'bad': bad_questions}
 
 
-def generat_image(image_model, topic: str):
-    # topic = News()
-    # topic_prompt = topic.get_news_story_prompt()
-    # prompt = topic_prompt[0]['content'] + topic_prompt[1]['content']
-    # topic_str = topic_model.generate_response(messages=prompt)
-
+def generate_image(image_model, topic: dict) -> dict:
+    images = {}
     picture = Picture()
-    picture_prompt = picture.get_picture_prompt(text=json.dumps(topic))
-    image = image_model.generate_image(prompt=picture_prompt)
-    return image
+    for language in LANGUAGES:
+        picture_prompt = picture.get_picture_prompt(text=json.dumps(topic[language][0]))
+        image = image_model.generate_image(prompt=picture_prompt)
+        images[language] = image
+    return images
 
 
 if __name__ == "__main__":
@@ -140,9 +138,9 @@ if __name__ == "__main__":
     verified_questions = verify(gemini_model=gemini, openai_model=openai, questions=questions)
 
     #### PICTURE GENERATION
-    image = generat_image(image_model=openai, topic=news_lst[0]["text"])
+    images = generate_image(image_model=openai, topic=verified_questions['good'])  # news_lst[0]["text"])
 
     #### TG
     asyncio.run(bot.send_image_quizzes(chats=Config.CHANNEL_ID,
                                        questions=verified_questions['good'],
-                                       image=image))
+                                       images=images))

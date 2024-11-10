@@ -296,7 +296,7 @@ class Picture:
         """
         prompt = f"""
             Please create a symbolic or thematic illustration that captures the essence of the text in 
-            a {style} style:
+            a {style} style. The text can be both a simple text and a quiz task in a json-like format:
             {text}.
             If you aren't able to generate such an image because it did not align with the content policy 
             guidelines, please do a symbolic or thematic illustration that relates to one of the most significant 
