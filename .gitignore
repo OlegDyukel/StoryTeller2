@@ -1,0 +1,12 @@
+.env
+# Environment
+.venv/
+
+# Python cache
+src/__pycache__/
+
+# Local Database
+words.db
+
+# Data directory
+data/
