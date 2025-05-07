@@ -117,9 +117,13 @@ class News:
 
 
 class Tasks:
-    def __init__(self, news: list, language: str):
+    def __init__(self, news: list, language: str, word: str = None):
         super().__init__()
         self.language = language
+        if word is None:
+            self.word_phrase = 'definition of a word (phrasal verbs or other intermediate level words).'
+        else:
+            self.word_phrase = f'a {word} definition. The definition should be succinct: from 2 to 10 words.'   
         self.question_format = [
             {
                 "question_id": "<ID of the question (1, 2, 3, 4, ...)>",
@@ -191,7 +195,7 @@ class Tasks:
         You are a language learning quiz generator in {self.language}. 
         Your task is to create multiple-choice questions 
         focused on {self.language} grammar and vocabulary. 
-        """
+        """    
 
         prompt = f"""
         Please generate a list of {n_questions} questions with multiple-choice options and indicate 
@@ -205,11 +209,14 @@ class Tasks:
         The output should have the following format:
         {json.dumps(self.question_format)}
         Here is an example to illustrate the format: {json.dumps(self.question_example)}
-        
-        The first question should be a {self.question_grammar_news_mapping[0]['grammar_topic']} grammar question 
-        and related to {self.question_grammar_news_mapping[0]['news']} news. And please put the correct option to
-        {self.question_grammar_news_mapping[0]['correct_answer_id']} element of the list with options. Add an 
-        explanation of the correct option. The question length must not exceed 250 characters.
+
+        The first question should be about {self.word_phrase}. Please check whether the word or phrase exists 
+        and is spelled correctly, and make corrections if needed.
+        Then please suggest one correct definition and {n_questions - 1} incorrect definitions then please put 
+        the correct option to {self.question_grammar_news_mapping[0]['correct_answer_id']} element of the 
+        list with options.
+        The question length must not exceed 250 characters.
+        Example: {json.dumps(self.question_example[-1])}
         
         The second question should be a {self.question_grammar_news_mapping[1]['grammar_topic']} grammar question 
         and related to {self.question_grammar_news_mapping[1]['news']} news. And please put the correct option to
@@ -220,14 +227,11 @@ class Tasks:
         and related to {self.question_grammar_news_mapping[2]['news']} news. And please put the correct option to
         {self.question_grammar_news_mapping[2]['correct_answer_id']} element of the list with options. Add an 
         explanation of the correct option. The question length must not exceed 250 characters.
-        
-        The fourth question should be about definition of a word (phrasal verbs or other intermediate level 
-        words).
-        The explanation should be just an example of some sentence using the following news:
-        {self.question_grammar_news_mapping[3]['news']}. And please put the correct option to
-        {self.question_grammar_news_mapping[3]['correct_answer_id']} element of the list with options.
-        The question length must not exceed 250 characters.
-        Example: {json.dumps(self.question_example[-1])}
+
+        The fourth question should be a {self.question_grammar_news_mapping[3]['grammar_topic']} grammar question 
+        and related to {self.question_grammar_news_mapping[3]['news']} news. And please put the correct option to
+        {self.question_grammar_news_mapping[3]['correct_answer_id']} element of the list with options. Add an 
+        explanation of the correct option. The question length must not exceed 250 characters.
         
         Constraints: {JSON_CONSTRAINTS}
         Please generate similar questions in this format, ensuring the options are varied and the 
@@ -285,6 +289,22 @@ class Tasks:
         return messages
 
 
+class QuizDefinitions:
+    def __init__(self, language: str, word_list: list):
+        self.language = language
+        self.word_list = word_list
+        self.definition_format = {"word1": "definition1", "word2": "definition2"} # Example format
+
+    def get_prompt(self) -> str:
+        """Generates the prompt string to request definitions for the word list."""
+        prompt = f"""Provide short, distinct definitions for the following {self.language} words. 
+        Return the response ONLY as a valid JSON object where keys are the words and values are the definitions. 
+        Example format: {json.dumps(self.definition_format)}
+        Words: {', '.join(self.word_list)}
+        """
+        return prompt
+
+
 class Picture:
     def __init__(self):
         super().__init__()
@@ -295,12 +315,12 @@ class Picture:
         You are an artist working at Pixar or Disney Studios.
         """
         prompt = f"""
-            Please create a symbolic or thematic illustration that captures the essence of the text in 
-            a {style} style. The text can be both a simple text and a quiz task in a json-like format:
+            Please create a symbolic or thematic illustration that captures the essence of the word/phrase/text 
+            in a {style} style. The text can be both a simple text and a quiz task in a json-like format:
             {text}.
             If you aren't able to generate such an image because it did not align with the content policy 
-            guidelines, please do a symbolic or thematic illustration that relates to one of the most significant 
-            news story from this past week that had a significant impact on the world.
+            guidelines, please do a symbolic or thematic illustration that relates to one of the most 
+            significant news story from this past week that had a significant impact on the world.
         """
         messages = [
             {"role": "system", "content": system_prompt},

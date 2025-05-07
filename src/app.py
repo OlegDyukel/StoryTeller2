@@ -8,6 +8,7 @@ from openai_api import OpenaiAPI
 from gemini_api import GeminiAPI
 from config import Config
 from tg_api import TelegramBot
+from crud import get_random_words
 
 
 LANGUAGES = ['english', 'spanish']
@@ -39,7 +40,8 @@ def get_news(main_model, second_model) -> list:
 def get_quizzes(model, news: list) -> dict:
     questions = {}
     for language in LANGUAGES:
-        tasks = Tasks(news=news, language=language)
+        daily_word = get_random_words(language, 1)[0].word
+        tasks = Tasks(news=news, language=language, word=daily_word)
         questions_prompts = tasks.get_prompt()
         questions_str = model.generate_response(messages=questions_prompts)
         try:
