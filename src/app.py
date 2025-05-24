@@ -1,148 +1,166 @@
-import json
 import asyncio
 import logging
 import sys
+import json # Keep for logging if necessary, but primary JSON logic is in generators
 
-from prompts import News, Tasks, Picture
-from openai_api import OpenaiAPI
-from gemini_api import GeminiAPI
-from config import Config
-from tg_api import TelegramBot
-from crud import get_random_words
+# Configuration
+from src.config import Config
 
+# AI Model Implementations
+from src.openai_api import OpenaiAPI
+from src.gemini_api import GeminiAPI
 
-LANGUAGES = ['english', 'spanish']
+# Messaging Service Implementation
+from src.tg_api import TelegramBot
 
-# Configure logging to use StreamHandler to direct logs to stdout
+# Generator Classes
+from src.generators import (
+    NewsGenerator,
+    QuizGenerator,
+    QuizVerifier,
+    ImageGenerator,
+    LANGUAGES # Import LANGUAGES constant from generators.py
+)
+
+# CRUD operations (still needed for get_random_words, which is used by QuizGenerator internally)
+# No, QuizGenerator calls get_random_words internally, so app.py doesn't need it directly.
+# from src.crud import get_random_words 
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
     handlers=[
-        logging.StreamHandler(sys.stdout)
+        logging.StreamHandler(sys.stdout) # Log to stdout
+        # Optionally, add a FileHandler if you want to log to a file as well
+        # logging.FileHandler("app.log") 
     ]
 )
 
-def get_news(main_model, second_model) -> list:
-    news = News()
-    news_prompt = news.get_prompt()
-    news_str = second_model.generate_response(messages=news_prompt[0]['content'] + news_prompt[1]['content'])
-    try:
-        news_lst = json.loads(news_str)
-        logging.info(f"Generated News: {news_lst}")
-    except json.decoder.JSONDecodeError as e:
-        logging.error(f"Most likely the News are not in json: {e}")
-        logging.info(f"The prompt: {news_prompt[0]['content']}. The output: {news_str}")
-        asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=news_str))
-        raise ValueError("Failed to get news in JSON format")
-    return news_lst
-
-
-def get_quizzes(model, news: list) -> dict:
-    questions = {}
-    for language in LANGUAGES:
-        daily_word = get_random_words(language, 1)[0].word
-        tasks = Tasks(news=news, language=language, word=daily_word)
-        questions_prompts = tasks.get_prompt()
-        questions_str = model.generate_response(messages=questions_prompts)
-        try:
-            questions[language] = json.loads(questions_str)
-            logging.info(f"Generated Quizzes: {questions[language]}")
-        except json.decoder.JSONDecodeError as e:
-            error_msg = f"Most likely the Quizzes are not in json format: {e}"
-            logging.error(error_msg)
-            logging.info(f"The prompt: {questions_prompts[1]['content']}. The output: {questions_prompts}")
-            asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'],
-                                         message=questions_prompts[1]['content'] + questions_str))
-            raise ValueError(error_msg)
-    return questions
-
-
-def verify(gemini_model: GeminiAPI, openai_model: OpenaiAPI, questions: dict) -> dict:
-    good_questions = {language: [] for language in LANGUAGES}
-    bad_questions = {language: [] for language in LANGUAGES}
-    initial_opinion = {language: [] for language in LANGUAGES}
-    second_opinion = {language: [] for language in LANGUAGES}
-    third_opinion = {language: [] for language in LANGUAGES}
-
-    for language in LANGUAGES:
-        for q in questions[language]:
-            d = {'question_id': q['question_id'], 'correct_options': []}
-            d['correct_options'].append(q['options'][q['correct_option_id']])
-            initial_opinion[language].append(d)
-        # second and third opinions for verification
-        tasks = Tasks(news=news_lst, language=language)
-        verification_prompt = tasks.verify(questions[language])
-        gemini_verif_str = gemini_model.generate_response(
-            messages=verification_prompt[0]['content'] + " " + verification_prompt[1]['content'])
-        try:
-            second_opinion[language] = json.loads(gemini_verif_str)
-            logging.info(f"Generated Verification: {second_opinion[language]}")
-        except Exception as e:
-            logging.error(f"Most likely Gemini Verification is not in json format: {e}")
-            logging.info(f"The prompt: {verification_prompt[1]['content']}")
-            logging.info(f"The output: {json.dumps(gemini_verif_str)}")
-            second_opinion[language] = initial_opinion[language]
-
-        openai_verif_str = openai_model.generate_response(messages=verification_prompt)
-        try:
-            third_opinion[language] = json.loads(openai_verif_str)
-            logging.info(f"Generated Verification: {third_opinion[language]}")
-        except Exception as e:
-            logging.error(f"Most likely OpenAi Verification is not in json format: {e}")
-            logging.info(f"The prompt: {verification_prompt[1]['content']}")
-            logging.info(f"The output: {json.dumps(openai_verif_str)}")
-            third_opinion[language] = initial_opinion[language]
-
-        for q, op2, op3 in zip(questions[language], second_opinion[language], third_opinion[language]):
-            if len(q['options']) != len(set(q['options'])):
-                bad_questions[language].append(q)
-                continue
-            if len(op2['correct_options']) != 1 or len(op3['correct_options']) != 1:
-                bad_questions[language].append(q)
-                continue
-            if op2['correct_options'][0] != q['options'][q['correct_option_id']]:
-                bad_questions[language].append(q)
-                continue
-            if op3['correct_options'][0] != q['options'][q['correct_option_id']]:
-                bad_questions[language].append(q)
-                continue
-            good_questions[language].append(q)
-
-    logging.info(f"Questions: {json.dumps(questions)}")
-    logging.info(f"The second opinion: {json.dumps(second_opinion)}")
-    logging.info(f"The third opinion: {json.dumps(third_opinion)}")
-    logging.info(f"Bad questions: {json.dumps(bad_questions)}")
-    return {'good': good_questions, 'bad': bad_questions}
-
-
-def generate_image(image_model, topic: dict) -> dict:
-    images = {}
-    picture = Picture()
-    for language in LANGUAGES:
-        picture_prompt = picture.get_picture_prompt(text=json.dumps(topic[language][0]))
-        image = image_model.generate_image(prompt=picture_prompt)
-        images[language] = image
-    return images
-
-
 if __name__ == "__main__":
-    openai = OpenaiAPI(api_key=Config.OPENAI_API_KEY, model='gpt-4.5-preview')
-    gemini = GeminiAPI(api_key=Config.GEMINI_API_KEY, model='gemini-2.0-flash')
-    bot = TelegramBot(token=Config.TG_TOKEN)
+    logging.info("Application started.")
 
-    #### NEWS GENERATION
-    news_lst = get_news(main_model=openai, second_model=gemini)
+    # --- 1. Instantiate Services (AI Models, Messaging) ---
+    try:
+        openai_service = OpenaiAPI(api_key=Config.OPENAI_API_KEY, model=Config.OPENAI_MODEL) # Using model from Config
+        gemini_service = GeminiAPI(api_key=Config.GEMINI_API_KEY, model=Config.GEMINI_MODEL) # Using model from Config
+        telegram_bot = TelegramBot(token=Config.TG_TOKEN)
+        logging.info("AI services and Telegram bot instantiated.")
+    except Exception as e:
+        logging.error(f"Failed to instantiate core services: {e}", exc_info=True)
+        sys.exit("Core service instantiation failed. Exiting.")
 
-    #### QUIZZES GENERATION
-    questions = get_quizzes(model=openai, news=news_lst)
+    # --- 2. Instantiate Generator Classes ---
+    # Injecting AI model instances and the bot (for error notification)
+    # Using Gemini for news (as per original logic: second_model for news)
+    news_generator = NewsGenerator(text_generator=gemini_service, error_notifier=telegram_bot)
+    # Using OpenAI for quiz generation (as per original logic: main_model for quizzes)
+    quiz_generator = QuizGenerator(text_generator=openai_service, error_notifier=telegram_bot, languages=LANGUAGES)
+    # Verifier uses both models
+    quiz_verifier = QuizVerifier(primary_text_generator=openai_service, verifier_text_generator=gemini_service, languages=LANGUAGES)
+    # Image generator uses OpenAI (as per original logic)
+    image_generator = ImageGenerator(image_generator_model=openai_service, languages=LANGUAGES)
+    logging.info("Generator classes instantiated.")
 
-    #### VERIFICATION
-    verified_questions = verify(gemini_model=gemini, openai_model=openai, questions=questions)
+    # --- 3. Orchestrate Content Generation and Verification ---
+    news_articles = []
+    all_quizzes = {}
+    verified_quizzes_dict = {'good': {lang: [] for lang in LANGUAGES}, 'bad': {lang: [] for lang in LANGUAGES}}
+    images_by_lang = {}
 
-    #### PICTURE GENERATION
-    images = generate_image(image_model=openai, topic=verified_questions['good'])  # news_lst[0]["text"])
+    try:
+        # --- News Generation ---
+        logging.info("Starting news generation...")
+        news_articles = news_generator.get_news()
+        if not news_articles:
+            logging.error("News generation failed or returned empty. Check logs from NewsGenerator.")
+            # Depending on desired behavior, could exit or try to proceed without news
+            # For now, we'll let it proceed, subsequent steps might fail or do nothing.
+        else:
+            logging.info(f"Successfully generated {len(news_articles)} news articles.")
 
-    #### TG
-    asyncio.run(bot.send_image_quizzes(chats=Config.CHANNEL_ID,
-                                       questions=verified_questions['good'],
-                                       images=images))
+        # --- Quiz Generation ---
+        if news_articles: # Only generate quizzes if news was successfully fetched
+            logging.info("Starting quiz generation...")
+            all_quizzes = quiz_generator.generate_quizzes(news=news_articles)
+            if not any(all_quizzes.values()): # Check if any quizzes were generated for any language
+                logging.warning("Quiz generation resulted in no quizzes for any language.")
+            else:
+                for lang, q_list in all_quizzes.items():
+                    logging.info(f"Generated {len(q_list)} quizzes for {lang}.")
+        else:
+            logging.warning("Skipping quiz generation because news generation failed.")
+
+        # --- Quiz Verification ---
+        # Proceed with verification even if some languages have no quizzes,
+        # QuizVerifier should handle empty lists gracefully.
+        if news_articles: # Verification context might depend on news articles
+            logging.info("Starting quiz verification...")
+            verified_quizzes_dict = quiz_verifier.verify_quizzes(questions_by_lang=all_quizzes, news_articles=news_articles)
+            good_quizzes = verified_quizzes_dict.get('good', {})
+            bad_quizzes = verified_quizzes_dict.get('bad', {})
+            for lang in LANGUAGES:
+                logging.info(f"For {lang}: Good quizzes: {len(good_quizzes.get(lang, []))}, Bad quizzes: {len(bad_quizzes.get(lang, []))}")
+        else:
+            logging.warning("Skipping quiz verification because news generation failed.")
+            # Ensure good_quizzes and bad_quizzes are initialized to avoid errors later
+            good_quizzes = {lang: [] for lang in LANGUAGES}
+            bad_quizzes = {lang: [] for lang in LANGUAGES}
+
+
+        # --- Image Generation (based on good quizzes) ---
+        # Check if there are any good quizzes to generate images for
+        if any(good_quizzes.values()):
+            logging.info("Starting image generation for good quizzes...")
+            images_by_lang = image_generator.generate_images_for_topics(topics_by_lang=good_quizzes)
+            for lang, img in images_by_lang.items():
+                logging.info(f"Generated image for {lang}: {type(img)}")
+        else:
+            logging.warning("No good quizzes available to generate images for.")
+            
+    except ValueError as ve: # Catch ValueErrors raised by generators on critical failures
+        logging.error(f"A critical error occurred during content generation: {ve}", exc_info=True)
+        # Optionally notify via Telegram about the critical failure
+        asyncio.run(telegram_bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=f"Application critical error: {ve}"))
+        sys.exit("Content generation pipeline failed. Exiting.")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred in the generation pipeline: {e}", exc_info=True)
+        asyncio.run(telegram_bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=f"Application unexpected error: {e}"))
+        sys.exit("Unexpected error in pipeline. Exiting.")
+
+
+    # --- 4. Send Content to Telegram ---
+    # Send good quizzes with images
+    # The send_image_quizzes method in TelegramBot is expected to handle the logic
+    # of sending an image followed by its related quiz polls for each language.
+    if any(good_quizzes.values()): # Check if there are any good quizzes to send
+        logging.info("Sending good quizzes with images to Telegram channels...")
+        try:
+            asyncio.run(telegram_bot.send_image_quizzes(
+                chats=Config.CHANNEL_ID, # CHANNELS_ID in original config, should be CHANNEL_ID
+                questions=good_quizzes,
+                images=images_by_lang
+            ))
+            logging.info("Finished sending good quizzes and images.")
+        except Exception as e:
+            logging.error(f"Error sending good quizzes with images to Telegram: {e}", exc_info=True)
+    else:
+        logging.info("No good quizzes were available to send to Telegram.")
+
+    # Send bad quizzes to the log channel for review
+    if any(bad_quizzes.values()): # Check if there are any bad quizzes
+        logging.info("Sending bad quizzes to log channel...")
+        try:
+            # send_bad_quizzes expects questions to be a dict like {'language': [quiz_list]}
+            # It internally iterates and sends all to the single log channel.
+            asyncio.run(telegram_bot.send_bad_quizzes(
+                chats={"log": Config.LOG_CHANNEL_ID['log']}, # send_bad_quizzes expects chats['log']
+                questions=bad_quizzes
+            ))
+            logging.info("Finished sending bad quizzes to log channel.")
+        except Exception as e:
+            logging.error(f"Error sending bad quizzes to Telegram log channel: {e}", exc_info=True)
+    else:
+        logging.info("No bad quizzes to send to the log channel.")
+
+    logging.info("Application finished.")
