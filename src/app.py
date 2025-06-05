@@ -126,8 +126,8 @@ def generate_image(image_model, topic: dict) -> dict:
 
 
 if __name__ == "__main__":
-    openai = OpenaiAPI(api_key=Config.OPENAI_API_KEY, model='gpt-4.5-preview')
-    gemini = GeminiAPI(api_key=Config.GEMINI_API_KEY, model='gemini-2.0-flash')
+    openai = OpenaiAPI(api_key=Config.OPENAI_API_KEY, model=Model.model_1)
+    gemini = GeminiAPI(api_key=Config.GEMINI_API_KEY, model=Model.model_2)
     bot = TelegramBot(token=Config.TG_TOKEN)
 
     #### NEWS GENERATION

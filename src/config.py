@@ -1,5 +1,11 @@
 import os
 
+
+class Model:
+    model_1 = 'gpt-4.5-preview'
+    model_2 = 'gemini-2.5-flash'
+
+
 class Config:
     SECRET_KEY = os.urandom(44)
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
