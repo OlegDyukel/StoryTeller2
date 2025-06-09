@@ -3,7 +3,7 @@ import os
 
 class Model:
     model_1 = 'gpt-4.5-preview'
-    model_2 = 'gemini-2.5-flash'
+    model_2 = 'gemini-2.0-flash'
 
 
 class Config:

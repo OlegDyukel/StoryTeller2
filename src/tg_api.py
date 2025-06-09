@@ -80,7 +80,6 @@ class TelegramBot:
                 logging.info("Image successfully posted to Telegram channel.")
             except Exception as e:
                 logging.error(f"Error occurred while posting to Telegram: {e}")
-            await asyncio.sleep(3)
             for question in questions_lst:
                 try:
                     await self.bot.send_poll(

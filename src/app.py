@@ -6,7 +6,7 @@ import sys
 from prompts import News, Tasks, Picture
 from openai_api import OpenaiAPI
 from gemini_api import GeminiAPI
-from config import Config
+from config import Config, Model
 from tg_api import TelegramBot
 from crud import get_random_words
 
