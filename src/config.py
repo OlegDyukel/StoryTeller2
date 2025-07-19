@@ -2,7 +2,7 @@ import os
 
 
 class Model:
-    model_1 = 'gpt-4.1-2025-04-14'
+    model_1 = 'gpt-4o'
     model_2 = 'gemini-2.0-flash'
 
 
