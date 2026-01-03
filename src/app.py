@@ -22,17 +22,49 @@ logging.basicConfig(
     ]
 )
 
+
+def _preview_text(text: str, head: int = 500, tail: int = 500) -> str:
+    if not text:
+        return ""
+    if len(text) <= head + tail:
+        return text
+    return f"{text[:head]}\n...<snip {len(text) - head - tail} chars>...\n{text[-tail:]}"
+
+
+def _truncate_for_tg(text: str, limit: int = 3500) -> str:
+    if not text:
+        return ""
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}\n...<truncated {len(text) - limit} chars>..."
+
 def get_news(main_model, second_model) -> list:
     news = News()
     news_prompt = news.get_prompt()
-    news_str = second_model.generate_response(messages=news_prompt[0]['content'] + news_prompt[1]['content'])
+    logging.info(
+        "News generation: prompt sizes=%s",
+        [len(m.get('content', '') or '') for m in news_prompt]
+    )
+    try:
+        news_str = second_model.generate_response(messages=news_prompt[0]['content'] + news_prompt[1]['content'])
+    except Exception:
+        logging.exception("News generation failed during model.generate_response")
+        raise
+
+    logging.info("News generation: response length=%s", len(news_str or ""))
+    logging.info("News generation: response preview=%s", _preview_text(news_str or ""))
     try:
         news_lst = json.loads(news_str)
         logging.info(f"Generated News: {news_lst}")
     except json.decoder.JSONDecodeError as e:
         logging.error(f"Most likely the News are not in json: {e}")
         logging.info(f"The prompt: {news_prompt[0]['content']}. The output: {news_str}")
-        asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'], message=news_str))
+        asyncio.run(
+            bot.send_message(
+                chat_id=Config.LOG_CHANNEL_ID['log'],
+                message=_truncate_for_tg(news_str or "")
+            )
+        )
         raise ValueError("Failed to get news in JSON format")
     return news_lst
 
@@ -43,16 +75,61 @@ def get_quizzes(model, news: list) -> dict:
         daily_word = get_random_words(language, 1)[0].word
         tasks = Tasks(news=news, language=language, word=daily_word)
         questions_prompts = tasks.get_prompt()
-        questions_str = model.generate_response(messages=questions_prompts)
+
+        logging.info(
+            "Quiz generation start: language=%s daily_word=%s prompt_messages=%s prompt_sizes=%s",
+            language,
+            daily_word,
+            len(questions_prompts),
+            [len(m.get('content', '') or '') for m in questions_prompts]
+        )
+        try:
+            questions_str = model.generate_response(messages=questions_prompts)
+        except Exception:
+            logging.exception(
+                "Quiz generation failed during model.generate_response (language=%s)",
+                language
+            )
+            raise
+
+        questions_str = questions_str or ""
+        logging.info(
+            "Quiz generation: language=%s response length=%s",
+            language,
+            len(questions_str)
+        )
+        logging.info(
+            "Quiz generation: language=%s response preview=%s",
+            language,
+            _preview_text(questions_str)
+        )
+        if not questions_str.strip():
+            logging.error(
+                "Quiz generation: language=%s got empty/whitespace response; cannot parse JSON",
+                language
+            )
         try:
             questions[language] = json.loads(questions_str)
             logging.info(f"Generated Quizzes: {questions[language]}")
         except json.decoder.JSONDecodeError as e:
             error_msg = f"Most likely the Quizzes are not in json format: {e}"
             logging.error(error_msg)
-            logging.info(f"The prompt: {questions_prompts[1]['content']}. The output: {questions_prompts}")
+            logging.info(
+                "Quiz JSON parse failed: language=%s prompt_preview=%s",
+                language,
+                _preview_text((questions_prompts[1].get('content') or "") if len(questions_prompts) > 1 else "")
+            )
+            logging.info(
+                "Quiz JSON parse failed: language=%s raw_output_preview=%s",
+                language,
+                _preview_text(questions_str)
+            )
             asyncio.run(bot.send_message(chat_id=Config.LOG_CHANNEL_ID['log'],
-                                         message=questions_prompts[1]['content'] + questions_str))
+                                         message=_truncate_for_tg(
+                                             ((questions_prompts[1].get('content') or "") if len(questions_prompts) > 1 else "")
+                                             + "\n\nOUTPUT:\n"
+                                             + questions_str
+                                         )))
             raise ValueError(error_msg)
     return questions
 

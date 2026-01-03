@@ -93,6 +93,11 @@ class News:
             The text of news should be a narrative and easily perceived story.
             The text of the news can be 1, 2 or a maximum of 3 sentences and no more than 1000 characters.
             Ensure that each entry follows this structure with relevant and updated information as of {self.date}.
+            
+            Return only a valid JSON array with exactly {n_questions} items, no prologue/epilogue text,
+            no code fences, and no trailing commas. If a string needs quotes inside, escape them properly.
+            
+            CONSTRAINTS: {JSON_CONSTRAINTS}
             """
         messages = [
             {"role": "system", "content": system_prompt},

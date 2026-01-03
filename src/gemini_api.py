@@ -15,7 +15,7 @@ class GeminiAPI:
         self.generation_config = genai.types.GenerationConfig(
             candidate_count=1,
             temperature=kwargs.get('temperature', 0.1),
-            max_output_tokens=kwargs.get('max_tokens', 1000),
+            max_output_tokens=kwargs.get('max_tokens', 2000),
             # stop_sequences=["x"],
             response_mime_type='application/json',
             # response_schema=list[Verification]

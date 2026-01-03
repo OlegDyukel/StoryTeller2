@@ -1,9 +1,13 @@
 import os
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables from a .env file if present
+load_dotenv(find_dotenv(), override=False)
 
 
 class Model:
-    model_1 = 'gpt-4o'
-    model_2 = 'gemini-2.0-flash'
+    model_1 = 'gpt-5.2'
+    model_2 = 'gemini-3-flash-preview'
 
 
 class Config:
