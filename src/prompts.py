@@ -1,8 +1,10 @@
 import random
 import datetime
 import json
+from typing import Optional
 
-n_questions = 4
+N_QUESTIONS = 4
+N_OPTIONS = 4
 CATEGORIES = ['Sport', 'Disaster', 'Innovation', 'Science', 'Environment', 'Technology',
               'Healthcare', 'Politics']
 REGIONS = ['Europe', 'Asia', 'Africa', 'North America', 'South America', 'USA', 'China and India',
@@ -35,20 +37,22 @@ SPANISH_GRAMMAR_TOPICS = [
     "Negation (Negación)", "Word Order (Orden de las Palabras)"]
 
 PICTURE_STYLES = ['pixel art', 'vivid, lively', 'pixar/disney', 'realistic photography',
-                  'anime/manga', 'watercolor and traditional art', 'cyberpunk and futuristic eesthetics',
+                  'anime/manga', 'watercolor and traditional art', 'cyberpunk and futuristic aesthetics',
                   'minimalistic and flat', 'fantasy and mythological', 'surreal and abstract']
 
 TOPICS = {'english': ENGLISH_GRAMMAR_TOPICS, 'spanish': SPANISH_GRAMMAR_TOPICS}
 
 JSON_CONSTRAINTS = """
-Your response must be in JSON format,without using code blocks, additional text and the surrounding backticks.
+Your response must be in JSON format, without using code blocks, additional text and the surrounding backticks.
 Keys, property names and string values must be enclosed in double quotes,
 in order to json.loads() function can process the response properly.
 """
 
+MessageList = list[dict[str, str]]
+
+
 class News:
     def __init__(self):
-        self.date = datetime.datetime.today().date()
         self.news_format = [{"id": 1, "category": "sport", "region": "world", "text": "something ..."}, ]
         self.news_examples = [
             {
@@ -70,65 +74,65 @@ class News:
                 "text": "Australia has announced the creation of a new marine sanctuary in the Great Barrier Reef. This protected area aims to conserve biodiversity and restore coral ecosystems damaged by climate change and human activity."
             },
         ]
-        self.news_categories = random.sample(CATEGORIES, k=n_questions)
-        self.news_regions = random.sample(REGIONS, k=n_questions)
-        self.news_category_mapping = []
-        for i in range(n_questions):
-            d = {"news_id": i+1, "category": self.news_categories[i], "region": self.news_regions[i]}
-            self.news_category_mapping.append(d)
+        self.news_categories = random.sample(CATEGORIES, k=N_QUESTIONS)
+        self.news_regions = random.sample(REGIONS, k=N_QUESTIONS)
+        self.news_category_mapping = [
+            {"news_id": i + 1, "category": self.news_categories[i], "region": self.news_regions[i]}
+            for i in range(N_QUESTIONS)
+        ]
 
-    def get_prompt(self) -> list:
+    def get_prompt(self) -> MessageList:
+        date = datetime.datetime.today().date()
         system_prompt = "You are a news generator."
 
         prompt = f"""
-            Please generate {n_questions} diverse news stories with IDs, categories, regions, and texts 
-            as of {self.date} day
+            Please generate {N_QUESTIONS} diverse news stories with IDs, categories, regions, and texts
+            as of {date} day
             in the following JSON array without any additional text: {json.dumps(self.news_format)}
             Here is an example to illustrate the format: {json.dumps(self.news_examples)}
-            
+
             Constraints:
             News should be related to the following categories and regions:
             {json.dumps(self.news_category_mapping)}
-            
+
             The text of news should be a narrative and easily perceived story.
             The text of the news can be 1, 2 or a maximum of 3 sentences and no more than 1000 characters.
-            Ensure that each entry follows this structure with relevant and updated information as of {self.date}.
-            
-            Return only a valid JSON array with exactly {n_questions} items, no prologue/epilogue text,
+            Ensure that each entry follows this structure with relevant and updated information as of {date}.
+
+            Return only a valid JSON array with exactly {N_QUESTIONS} items, no prologue/epilogue text,
             no code fences, and no trailing commas. If a string needs quotes inside, escape them properly.
-            
-            CONSTRAINTS: {JSON_CONSTRAINTS}
+
+            {JSON_CONSTRAINTS}
             """
-        messages = [
+        return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
-        return messages
 
-    def get_news_story_prompt(self) -> list:
+    def get_news_story_prompt(self) -> MessageList:
         system_prompt = "You are a news generator."
-        prompt = f"""
-            Please provide one of the most significant news story from this past week 
+        prompt = """
+            Please provide one of the most significant news story from this past week
             that has had a significant impact on the world.
             Constraints:
             The text of news should be a narrative and easily perceived story.
             The text of the news can be 1, 2 or a maximum of 3 sentences and no more than 1000 characters.
             """
-        messages = [
+        return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
-        return messages
 
 
 class Tasks:
-    def __init__(self, news: list, language: str, word: str = None):
-        super().__init__()
+    def __init__(self, news: list[dict], language: str, word: Optional[str] = None):
+        assert len(news) >= N_QUESTIONS, f"Expected at least {N_QUESTIONS} news items, got {len(news)}"
+
         self.language = language
         if word is None:
             self.word_phrase = 'definition of a word (phrasal verbs or other intermediate level words).'
         else:
-            self.word_phrase = f'a {word} definition. The definition should be succinct: from 2 to 10 words.'   
+            self.word_phrase = f'a <word>{word}</word> definition. The definition should be succinct: from 2 to 10 words.'
         self.question_format = [
             {
                 "question_id": "<ID of the question (1, 2, 3, 4, ...)>",
@@ -184,126 +188,128 @@ class Tasks:
                                      {"question_id": 4, "correct_options":
                                          ["to reduce the volume or intensity of something",
                                           "to reject or refuse something, such as an offer or invitation"]}]
-        self.grammar_topics = random.sample(TOPICS[self.language], k=n_questions)
-        self.correct_answers = random.sample([0, 1, 2, 3, 0, 1, 2, 3], k=4)
-        self.question_grammar_news_mapping = []
-        for i in range(n_questions):
-            d = {"question_id": i+1, "grammar_topic": self.grammar_topics[i], "news": news[i]['text'],
-                 "correct_answer_id": self.correct_answers[i]}
-            self.question_grammar_news_mapping.append(d)
+        self.grammar_topics = random.sample(TOPICS[self.language], k=N_QUESTIONS)
+        self.correct_answers = [random.randint(0, N_OPTIONS - 1) for _ in range(N_QUESTIONS)]
+        self.question_grammar_news_mapping = [
+            {
+                "question_id": i + 1,
+                "grammar_topic": self.grammar_topics[i],
+                "news": news[i]['text'],
+                "correct_answer_id": self.correct_answers[i],
+            }
+            for i in range(N_QUESTIONS)
+        ]
 
-    def get_correct_answers(self) -> list:
+    def get_correct_answers(self) -> list[dict]:
         return self.question_grammar_news_mapping
 
-    def get_prompt(self) -> list:
+    def get_prompt(self) -> MessageList:
         system_prompt = f"""
-        You are a language learning quiz generator in {self.language}. 
-        Your task is to create multiple-choice questions 
-        focused on {self.language} grammar and vocabulary. 
-        """    
+        You are a language learning quiz generator in {self.language}.
+        Your task is to create multiple-choice questions
+        focused on {self.language} grammar and vocabulary.
+        """
+
+        # Build per-question instructions dynamically
+        m0 = self.question_grammar_news_mapping[0]
+        vocab_instruction = f"""
+        The first question should be about {self.word_phrase}. Please check whether the word or phrase exists
+        and is spelled correctly, and make corrections if needed.
+        Then please suggest one correct definition and {N_OPTIONS - 1} incorrect definitions then please put
+        the correct option to {m0['correct_answer_id']} element of the list with options.
+        The question length must not exceed 250 characters.
+        Example: {json.dumps(self.question_example[-1])}
+        """
+
+        grammar_instructions = []
+        ordinals = ["second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"]
+        for i in range(1, N_QUESTIONS):
+            m = self.question_grammar_news_mapping[i]
+            grammar_instructions.append(
+                f"The {ordinals[i - 1]} question should be a {m['grammar_topic']} grammar question "
+                f"and related to <news>{m['news']}</news> news. And please put the correct option to "
+                f"{m['correct_answer_id']} element of the list with options. Add an "
+                f"explanation of the correct option. The question length must not exceed 250 characters."
+            )
 
         prompt = f"""
-        Please generate a list of {n_questions} questions with multiple-choice options and indicate 
-        the correct option for each question. 
-        Each item of the list should be structured as a dictionary with the following 
-        keys: `question_id`, `grammar_topic`, `question`, `options`, `correct_option_id` and `explanation`. 
-        The `options` key should contain 
-        a list of possible answers, and `correct_option_id` should be the index (integer) of the 
+        Please generate a list of {N_QUESTIONS} questions with multiple-choice options and indicate
+        the correct option for each question.
+        Each item of the list should be structured as a dictionary with the following
+        keys: `question_id`, `grammar_topic`, `question`, `options`, `correct_option_id` and `explanation`.
+        The `options` key should contain
+        a list of possible answers, and `correct_option_id` should be the index (integer) of the
         correct answer in the `options` list (0-indexed). The correct answer should be only one.
-        
+
         The output should have the following format:
         {json.dumps(self.question_format)}
         Here is an example to illustrate the format: {json.dumps(self.question_example)}
 
-        The first question should be about {self.word_phrase}. Please check whether the word or phrase exists 
-        and is spelled correctly, and make corrections if needed.
-        Then please suggest one correct definition and {n_questions - 1} incorrect definitions then please put 
-        the correct option to {self.question_grammar_news_mapping[0]['correct_answer_id']} element of the 
-        list with options.
-        The question length must not exceed 250 characters.
-        Example: {json.dumps(self.question_example[-1])}
-        
-        The second question should be a {self.question_grammar_news_mapping[1]['grammar_topic']} grammar question 
-        and related to {self.question_grammar_news_mapping[1]['news']} news. And please put the correct option to
-        {self.question_grammar_news_mapping[1]['correct_answer_id']} element of the list with options. Add an 
-        explanation of the correct option. The question length must not exceed 250 characters.
-        
-        The third question should be a {self.question_grammar_news_mapping[2]['grammar_topic']} grammar question 
-        and related to {self.question_grammar_news_mapping[2]['news']} news. And please put the correct option to
-        {self.question_grammar_news_mapping[2]['correct_answer_id']} element of the list with options. Add an 
-        explanation of the correct option. The question length must not exceed 250 characters.
+        {vocab_instruction}
 
-        The fourth question should be a {self.question_grammar_news_mapping[3]['grammar_topic']} grammar question 
-        and related to {self.question_grammar_news_mapping[3]['news']} news. And please put the correct option to
-        {self.question_grammar_news_mapping[3]['correct_answer_id']} element of the list with options. Add an 
-        explanation of the correct option. The question length must not exceed 250 characters.
-        
-        Constraints: {JSON_CONSTRAINTS}
-        Please generate similar questions in this format, ensuring the options are varied and the 
+        {chr(10).join(grammar_instructions)}
+
+        {JSON_CONSTRAINTS}
+        Please generate similar questions in this format, ensuring the options are varied and the
         correct option is accurately identified.
         The questions and answers should be in {self.language}.
         """
 
-        messages = [
+        return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
-        return messages
 
-    def verify(self, questions: list) -> list:
+    def verify(self, questions: list[dict]) -> MessageList:
+        assert len(questions) >= N_QUESTIONS, f"Expected at least {N_QUESTIONS} questions, got {len(questions)}"
+
         system_prompt = f"""
-        You are a professional linguist and an {self.language} teacher at university. 
+        You are a professional linguist and an {self.language} teacher at university.
         """
 
+        def _format_task(idx: int, q: dict) -> str:
+            return (f"Task {idx + 1}: {q['question']} \n"
+                    f"What answer/answers is/are correct? {json.dumps(q['options'])}")
+
+        example_tasks = "\n".join(_format_task(i, self.question_example[i])
+                                  for i in range(len(self.question_example)))
+        actual_tasks = "\n".join(_format_task(i, questions[i])
+                                 for i in range(N_QUESTIONS))
+
         prompt = f"""
-            You will receive {n_questions} language tasks related to grammar and vocabulary, 
-            with 4 possible answers for each task. The possible answers are in the list.
+            You will receive {N_QUESTIONS} language tasks related to grammar and vocabulary,
+            with {N_OPTIONS} possible answers for each task. The possible answers are in the list.
             Your task is to define which options are correct.
-            There might be 0, 1, 2, 3 or even 4 correct/possible answers. 
+            There might be 0, 1, 2, 3 or even {N_OPTIONS} correct/possible answers.
             You will receive structured enumerated tasks and you need to return a result in JSON format.
             The input and output have the following structure:
             EXAMPLE OF INPUT:
-            Task 1: {self.question_example[0]['question']} 
-            What answer/answers is/are correct? {json.dumps(self.question_example[0]['options'])}
-            Task 2: {self.question_example[1]['question']}
-            What answer/answers is/are correct? {json.dumps(self.question_example[1]['options'])}
-            Task 3: {self.question_example[2]['question']}
-            What answer/answers is/are correct? {json.dumps(self.question_example[2]['options'])}
-            Task 4: {self.question_example[3]['question']}
-            What answer/answers is/are correct? {json.dumps(self.question_example[3]['options'])}
+            {example_tasks}
             OUTPUT FORMAT:
             {json.dumps(self.verification_format)}
             EXAMPLE OF OUTPUT:
             {json.dumps(self.verification_example)}.
             So following the instructions above please provide answers to the following tasks:
-            Task 1: {questions[0]['question']} 
-            What answer/answers is/are correct? {json.dumps(questions[0]['options'])}
-            Task 2: {questions[1]['question']}
-            What answer/answers is/are correct? {json.dumps(questions[1]['options'])}
-            Task 3: {questions[2]['question']}
-            What answer/answers is/are correct? {json.dumps(questions[2]['options'])}
-            Task 4: {questions[3]['question']}
-            What answer/answers is/are correct? {json.dumps(questions[3]['options'])}
-            
-            CONSTRAINTS: {JSON_CONSTRAINTS}
+            {actual_tasks}
+
+            {JSON_CONSTRAINTS}
         """
-        messages = [
+        return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
-        return messages
 
 
 class QuizDefinitions:
-    def __init__(self, language: str, word_list: list):
+    def __init__(self, language: str, word_list: list[str]):
         self.language = language
         self.word_list = word_list
-        self.definition_format = {"word1": "definition1", "word2": "definition2"} # Example format
+        self.definition_format = {"word1": "definition1", "word2": "definition2"}
 
     def get_prompt(self) -> str:
         """Generates the prompt string to request definitions for the word list."""
-        prompt = f"""Provide short, distinct definitions for the following {self.language} words. 
-        Return the response ONLY as a valid JSON object where keys are the words and values are the definitions. 
+        prompt = f"""Provide short, distinct definitions for the following {self.language} words.
+        Return the response ONLY as a valid JSON object where keys are the words and values are the definitions.
         Example format: {json.dumps(self.definition_format)}
         Words: {', '.join(self.word_list)}
         """
@@ -311,24 +317,14 @@ class QuizDefinitions:
 
 
 class Picture:
-    def __init__(self):
-        super().__init__()
-
     def get_picture_prompt(self, text: str) -> str:
         style = random.choice(PICTURE_STYLES)
-        system_prompt = f"""
-        You are an artist working at Pixar or Disney Studios.
-        """
-        prompt = f"""
-            Please create a symbolic or thematic illustration that captures the essence of the word/phrase/text 
-            in a {style} style. The text can be both a simple text and a quiz task in a json-like format:
-            {text}.
-            If you aren't able to generate such an image because it did not align with the content policy 
-            guidelines, please do a symbolic or thematic illustration that relates to one of the most 
-            significant news story from this past week that had a significant impact on the world.
-        """
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ]
-        return messages[0]['content'] + messages[1]['content']
+        return (
+            f"You are an artist working at Pixar or Disney Studios.\n"
+            f"Please create a symbolic or thematic illustration that captures the essence of the word/phrase/text "
+            f"in a {style} style. The text can be both a simple text and a quiz task in a json-like format:\n"
+            f"<content>{text}</content>.\n"
+            f"If you aren't able to generate such an image because it did not align with the content policy "
+            f"guidelines, please do a symbolic or thematic illustration that relates to one of the most "
+            f"significant news story from this past week that had a significant impact on the world."
+        )
