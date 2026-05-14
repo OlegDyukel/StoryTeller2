@@ -1,3 +1,4 @@
+import base64
 from openai import OpenAI
 from io import BytesIO
 from PIL import Image
@@ -189,16 +190,18 @@ class OpenaiAPI:
             logging.error(f"OpenAI generate_response error: {e}")
             return None
 
-    def generate_image(self, prompt: str, model: str = "dall-e-3") -> Optional[Image.Image]:
-        # https://github.com/openai/openai-python/blob/main/examples/picture.py
+    def generate_image(self, prompt: str, model: str = "gpt-image-2") -> Optional[Image.Image]:
         try:
-            # Use the instantiated client for Images API to ensure API key is applied
             img_resp = self.client.images.generate(prompt=prompt, model=model)
-            # Download the image
-            img_url = img_resp.data[0].url
-            response = requests.get(img_url)
-            image = Image.open(BytesIO(response.content))
-            return image
+            data = img_resp.data[0]
+            if getattr(data, "b64_json", None):
+                image_bytes = base64.b64decode(data.b64_json)
+                return Image.open(BytesIO(image_bytes))
+            if getattr(data, "url", None):
+                response = requests.get(data.url)
+                return Image.open(BytesIO(response.content))
+            logging.error("OpenAI generate_image: no image data in response")
+            return None
         except Exception as e:
             logging.error(f"OpenAI generate_image error: {e}")
             return None
